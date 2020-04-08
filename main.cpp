@@ -1,55 +1,45 @@
 #include <QCoreApplication>
-#include <QDir>
-#include <QDataStream>
-#include <QFile>
-#include <QVector>
-#include <QElapsedTimer>
-#include <QThread>
+#include <string>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <thread>
+#include "SimpleTimer.hpp"
 
-bool Read(QString path, int speed = 1) {
-    QFile file { path };
-    QElapsedTimer timer;
+auto FileSize(std::string path) {
+    std::ifstream file( path, std::ios::binary | std::ios::ate);
+    return file.tellg();
+}
 
-    const unsigned int readSpeed = speed * 1024;
-    double size = file.size();
-        if ( !file.open(QIODevice::ReadOnly) )
+bool Read(std::string path, int speed = 1) {
+    SimpleTimer timer;
+    size_t pos = 0;
+    size_t bufferSize = 1024 * 1024;
+    size_t readSpeed = speed * bufferSize;
+    std::ifstream file{ path };
+    size_t size = FileSize(path);
+    std::unique_ptr<char[]> buffer(new char[bufferSize]);
+    std::cout << "Size" << size << std::endl;
+    if(size <= readSpeed)
+        readSpeed = size;
+    timer.Start();
+    while (pos < size)
+    {
+        for(size_t cur = 0; cur < readSpeed; cur += bufferSize)
         {
-            std::cout << file.errorString().toUtf8().constData();
-            return false;
+            if(pos + bufferSize > size)
+                bufferSize = size - pos;
+             file.read(buffer.get(), bufferSize);
+             pos += bufferSize;
+             file.seekg(pos);
+             std::cout << std::fixed << "Read..."  << static_cast<double>(pos)/size * 100 << '%' << std::endl;
         }
 
-        const auto memory = file.map( 0, size );
-        if ( memory == nullptr )
-        {
-            std::cout << "Mapping fialed!"  << std::endl;;
-            return false;
-        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000 - timer.Duration()));
+        timer.ResetTime();
+    }
 
-        std::cout << file.size() << std::endl;
 
-        size_t pos = 0;
-
-        timer.start();
-        while(file.read(readSpeed).size() > 0)
-        {
-            std::cout << "Read..."  << pos/size * 100 << '%' << std::endl;
-            pos += readSpeed;
-            file.seek(pos);
-            QThread::usleep(1000000 - timer.elapsed() * 1000);
-            timer.restart();
-        }
-
-        if( pos != size )
-        {
-           std::cout << "Read..."  << 100 << '%' << std::endl;
-        }
-
-        if ( !file.unmap( memory ) )
-        {
-            std::cout << "Unmapping failed!"  << std::endl;;
-            return false;
-        }
     return true;
 }
 
@@ -57,23 +47,20 @@ bool Read(QString path, int speed = 1) {
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    std::string input{};
+
+    std::string directory{};
     std::cout << "Enter the directory:" << std::endl;
-    std::cin >> input;
-    QDir directory(QString::fromStdString(input));
-    QStringList files = directory.entryList(QStringList(),QDir::Files);
-
+    std::cin >> directory;
     std::cout << "List of files in this directory:" << std::endl;
-    foreach(QString filename, files) {
-    std::cout << filename.toUtf8().constData() << std::endl;
-     }
+    for (const auto & entry : std::filesystem::directory_iterator(directory))
+            std::cout << entry.path() << std::endl;
 
-
+    std::string fileName{};
     std::cout << "Enter the name of file:" << std::endl;
-    std::cin >> input;
+    std::cin >> fileName;
 
-    const auto filepath = "E:\\" + input;
-    Read(QString::fromStdString(filepath), 100000);
+    const auto filepath = directory + fileName;
+    Read(filepath, 1000000);
 
     return a.exec();
 }
