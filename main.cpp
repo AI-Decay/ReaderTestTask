@@ -5,13 +5,14 @@
 #include <fstream>
 #include <thread>
 #include "SimpleTimer.hpp"
+#include "..\\toml11-3.4.0\\toml.hpp"
 
-auto FileSize(std::string path) {
+auto FileSize(std::wstring path) {
     std::ifstream file( path, std::ios::binary | std::ios::ate);
     return file.tellg();
 }
 
-bool Read(std::string path, int speed = 1) {
+bool Read(std::wstring path, size_t speed = 1) {
     SimpleTimer timer;
     size_t pos = 0;
     size_t bufferSize = 1024;
@@ -60,30 +61,66 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    std::string directory{};
+    std::wstring directory{};
     std::cout << "Enter the directory:" << std::endl;
-    std::cin >> directory;
+    std::wcin >> directory;
     while(!std::filesystem::exists(directory))
     {
         std::cout << "Directory does not exist" << std::endl;
         std::cout << "Enter the directory:" << std::endl;
-        std::cin >> directory;
+        std::wcin >> directory;
     }
+    std::vector<std::wstring> directoryData;
+    std::wstring path{};
     std::cout << "List of files in this directory:" << std::endl;
     for (const auto & entry : std::filesystem::directory_iterator(directory))
-            std::cout << entry.path() << std::endl;
+    {
+            path = entry.path();
+            directoryData.push_back(path);
+            if(!std::filesystem::is_directory(path))
+               std::wcout << path << std::endl;
+    }
 
-    std::string fileName{};
+    std::wstring fileName{};
     std::cout << "Enter the name of file:" << std::endl;
-    std::cin >> fileName;
-    while(!std::filesystem::exists(directory + fileName))
+    std::wcin >> fileName;
+    while(!std::filesystem::exists(directory + fileName) || std::filesystem::is_directory(directory + fileName))
     {
         std::cout << "File does not exist" << std::endl;
         std::cout << "Enter the name of file:" << std::endl;
-        std::cin >> fileName;
+        std::wcin >> fileName;
     }
 
-    Read(directory + fileName, 1000000);
+    int rSpeed;
+    std::cout << "Enter the name reading speed" << std::endl;
+    std::cin >> rSpeed;
+    while(rSpeed < 0 || std::cin.fail())
+    {
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Invalid input, speed must be number and more than 0" << std::endl;
+        std::cout << "Enter the name reading speed" << std::endl;
+        std::cin >> rSpeed;
+    }
+
+    std::thread reading(Read, directory + fileName, rSpeed);
+
+    toml::value data{};
+    std::wofstream out("info.toml");
+    if (out.is_open())
+    {
+        for(const std::wstring& path : directoryData)
+        {
+            if(!std::filesystem::is_directory(path))
+               data = { { "file in this directory", path} };
+            else
+               data = { { "subdirectory in this directory", path} };
+           out << std::setprecision(30) << data << std::endl;
+        }
+    }
+    out.close();
+
+    reading.join();
 
     return a.exec();
 }
