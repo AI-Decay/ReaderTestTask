@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
             path = toml::find<std::string>(arrayOfPath, count++);
             th = std::thread(Read, path, speed);
         }
-        size -= 4;
+        size -= countOfThreads;
     }
 
 
