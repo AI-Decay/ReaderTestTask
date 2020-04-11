@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#include <stdexcept>
 #include <array>
 #include "SimpleTimer.hpp"
 #include "..\\toml11-3.4.0\\toml.hpp"
@@ -51,10 +52,13 @@ int main(int argc, char *argv[])
 
     std::array<std::thread, countOfThreads> threads;
 
+
     const auto file = toml::parse("..\\Info.toml");
     const auto data = toml::find(file, "path");
     const auto arrayOfPath = toml::find(data, "directory");
     const auto speed = toml::find<size_t>(data, "speed");
+
+
     size_t size = arrayOfPath.size();
     size_t count = 0;
     std::wstring path;
@@ -84,6 +88,7 @@ int main(int argc, char *argv[])
         if(x.joinable())
            x.join();
     }
+
 
     return a.exec();
 }

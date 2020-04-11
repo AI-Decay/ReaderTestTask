@@ -14,6 +14,9 @@ private:
 	const size_t bufferSize = 0;
 	std::vector<BYTE> data;
 	Mapper_Winapi_Uptr memory = nullptr;
+	unsigned int errorInfo = 0;
+	SYSTEM_INFO SysInfo;
+	DWORD SysGran;
 
 public:
 
@@ -33,22 +36,36 @@ public:
 
 			mapping = CreateFileMapping(file, NULL, PAGE_READONLY, 0, 0, 0);
 
+			if (mapping == NULL)
+			    errorInfo = GetLastError();
+
 			CloseHandle(file);
 		}
+
+		GetSystemInfo(&SysInfo);
+		SysGran = SysInfo.dwAllocationGranularity;
 
 		data.resize(bufferSize);
 	};
 
 	const std::vector<BYTE>& ReadFile(size_t pos) {
 
-		//int32_t x = static_cast<UINT32>((pos & 0xFFFFFFFF00000000LL) >> 32);
-		//int32_t y = static_cast<UINT32>(pos & 0xFFFFFFFFLL);
+	size_t MapViewStart = (pos / SysGran) * SysGran;
+	DWORD MapViewSize = (pos % SysGran) + bufferSize;
+	DWORD ViewDelta = pos - MapViewStart;
+	ULARGE_INTEGER ulOffset;
+	ulOffset.QuadPart = MapViewStart;
 
-		memory = Mapper_Winapi_Uptr{ static_cast<BYTE*>(MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, bufferSize)) };
-		std::memcpy(&data[0], memory.get(), bufferSize);
-		return data;
+	memory = Mapper_Winapi_Uptr{ static_cast<BYTE*>(MapViewOfFile(mapping, FILE_MAP_READ, ulOffset.HighPart, ulOffset.LowPart, bufferSize)) };
+	if (memory == nullptr)
+	    errorInfo = GetLastError();
+	else
+	   std::memcpy(&data[0], memory.get(), bufferSize);
+
+	  return data;
 	}
 
+	const unsigned int GetInfoError() { return errorInfo; }
 
 	~FileMapper() {
 		CloseHandle(mapping);
