@@ -12,7 +12,6 @@ private:
 	std::wstring path;
 	HANDLE mapping;
 	const size_t bufferSize = 0;
-	std::vector<BYTE> data;
 	Mapper_Winapi_Uptr memory = nullptr;
 	unsigned int errorInfo = 0;
 	SYSTEM_INFO SysInfo;
@@ -44,25 +43,23 @@ public:
 
 		GetSystemInfo(&SysInfo);
 		SysGran = SysInfo.dwAllocationGranularity;
-
-		data.resize(bufferSize);
 	};
 
-	const std::vector<BYTE>& ReadFile(size_t pos) {
+	bool ReadFile(size_t pos, std::vector<BYTE>& buffer) {
 
 	size_t MapViewStart = (pos / SysGran) * SysGran;
-	DWORD MapViewSize = (pos % SysGran) + bufferSize;
-	DWORD ViewDelta = pos - MapViewStart;
 	ULARGE_INTEGER ulOffset;
 	ulOffset.QuadPart = MapViewStart;
 
 	memory = Mapper_Winapi_Uptr{ static_cast<BYTE*>(MapViewOfFile(mapping, FILE_MAP_READ, ulOffset.HighPart, ulOffset.LowPart, bufferSize)) };
-	if (memory == nullptr)
+	if (memory == nullptr) {
 	    errorInfo = GetLastError();
+	    return false;
+	  }
 	else
-	   std::memcpy(&data[0], memory.get(), bufferSize);
+	   std::memcpy(&buffer[0], memory.get(), bufferSize);
 
-	  return data;
+	  return true;
 	}
 
 	const unsigned int GetInfoError() { return errorInfo; }

@@ -24,6 +24,7 @@ bool Read(std::wstring path, size_t speed = 1) {
     size_t readSpeed = speed * bufferSize;
     size_t size = FileSize(path);
     FileMapper mapper(path, bufferSize);
+    std::vector<BYTE> buffer(bufferSize);
     if(size <= readSpeed)
         readSpeed = size;
     timer.Start();
@@ -31,12 +32,17 @@ bool Read(std::wstring path, size_t speed = 1) {
     {
         for(size_t cur = 0; (pos < size) && (cur < readSpeed); cur += bufferSize)
         {
-            if(pos + bufferSize > size)
-               mapper.ReadFile(size - pos);
-            else
-               mapper.ReadFile(pos);
+            if(pos + bufferSize > size) {
+                if(mapper.ReadFile(size - pos, buffer))
+                    return false;
+              }
+            else {
+               if(mapper.ReadFile(pos, buffer))
+                 return false;
+             }
             pos += bufferSize;
         }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(1000 - timer.Duration()));
         timer.ResetTime();
     }
@@ -52,23 +58,38 @@ int main(int argc, char *argv[])
 
     std::array<std::thread, countOfThreads> threads;
 
-
+    size_t speed;
+    toml::basic_value<toml::discard_comments, std::unordered_map, std::vector> arrayOfPath;
+    std::vector<std::wstring> paths;
+try {
     const auto file = toml::parse("..\\Info.toml");
     const auto data = toml::find(file, "path");
-    const auto arrayOfPath = toml::find(data, "directory");
-    const auto speed = toml::find<size_t>(data, "speed");
+    arrayOfPath = toml::find(data, "directory");
+    speed = toml::find<size_t>(data, "speed");
 
+    for(size_t i = 0; i < arrayOfPath.size(); i++)
+    {
+        paths.push_back(toml::find<std::wstring>(arrayOfPath, i));
+    }
+
+  }
+    catch(toml::exception& ex)
+    {
+        std::cout << ex.what() << std::endl;
+        return -1;
+    }
 
     size_t size = arrayOfPath.size();
+
+
+
     size_t count = 0;
-    std::wstring path;
 
     while(size/countOfThreads != 0)
     {
         for(auto& th : threads)
         {
-            path = toml::find<std::wstring>(arrayOfPath, count++);
-            th = std::thread(Read, path, speed);
+            th = std::thread(Read, paths[count++], speed);
         }
         size -= countOfThreads;
     }
@@ -80,8 +101,7 @@ int main(int argc, char *argv[])
 
     for(size_t i = 0; i < size; i++)
     {
-        path = toml::find<std::wstring>(arrayOfPath, count++);
-        threads[i] = std::thread(Read, path, speed);
+        threads[i] = std::thread(Read, paths[count++], speed);
     }
 
     for(auto& x : threads) {
