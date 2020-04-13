@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <array>
 #include "SimpleTimer.hpp"
-#include "..\\toml11-3.4.0\\toml.hpp"
+#include "toml11\\toml.hpp"
 #include "FileMapper.hpp"
 
 constexpr auto countOfThreads = 4;
