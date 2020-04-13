@@ -24,6 +24,8 @@ bool Read(std::wstring path, size_t speed = 1) {
     size_t readSpeed = speed * bufferSize;
     size_t size = FileSize(path);
     FileMapper mapper(path, bufferSize);
+    if(mapper.GetInfoError() != 0)
+       return false;
     std::vector<BYTE> buffer(bufferSize);
     if(size <= readSpeed)
         readSpeed = size;
@@ -61,6 +63,7 @@ int main(int argc, char *argv[])
     size_t speed;
     toml::basic_value<toml::discard_comments, std::unordered_map, std::vector> arrayOfPath;
     std::vector<std::wstring> paths;
+    std::wstring path;
 try {
     const auto file = toml::parse("..\\Info.toml");
     const auto data = toml::find(file, "path");
@@ -69,7 +72,9 @@ try {
 
     for(size_t i = 0; i < arrayOfPath.size(); i++)
     {
-        paths.push_back(toml::find<std::wstring>(arrayOfPath, i));
+        path = toml::find<std::wstring>(arrayOfPath, i);
+        if(!std::filesystem::is_directory(path) && std::filesystem::exists(path))
+           paths.push_back(path);
     }
 
   }
