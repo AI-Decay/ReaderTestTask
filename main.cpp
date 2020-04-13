@@ -84,7 +84,7 @@ try {
         return -1;
     }
 
-    size_t size = arrayOfPath.size();
+    size_t size = paths.size();
 
 
 
@@ -99,10 +99,10 @@ try {
         size -= countOfThreads;
     }
 
-
-    for(auto& x : threads) {
-        x.join();
-    }
+    if(count >= 4)
+      for(auto& x : threads) {
+          x.join();
+      }
 
     for(size_t i = 0; i < size; i++)
     {
