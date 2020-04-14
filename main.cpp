@@ -6,6 +6,7 @@
 #include <thread>
 #include <stdexcept>
 #include <array>
+#include <codecvt>
 #include "SimpleTimer.hpp"
 #include "toml11\\toml.hpp"
 #include "FileMapper.hpp"
@@ -20,7 +21,7 @@ bool Read(std::wstring path, size_t speed = 1) {
 
     SimpleTimer timer;
     size_t pos = 0;
-    constexpr size_t bufferSize = 1024;
+    constexpr size_t bufferSize = 1024 * 1024;
     size_t readSpeed = speed * bufferSize;
     size_t size = FileSize(path);
     FileMapper mapper(path, bufferSize);
@@ -35,13 +36,13 @@ bool Read(std::wstring path, size_t speed = 1) {
         for(size_t cur = 0; (pos < size) && (cur < readSpeed); cur += bufferSize)
         {
             if(pos + bufferSize > size) {
-                if(mapper.ReadFile(size - pos, buffer))
+                if(!mapper.ReadFile(size - pos, buffer))
                     return false;
               }
             else {
-               if(mapper.ReadFile(pos, buffer))
-                 return false;
-             }
+               if(!mapper.ReadFile(pos, buffer))
+                  return false;
+              }
             pos += bufferSize;
         }
 
@@ -57,13 +58,13 @@ bool Read(std::wstring path, size_t speed = 1) {
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     std::array<std::thread, countOfThreads> threads;
 
     size_t speed;
     toml::basic_value<toml::discard_comments, std::unordered_map, std::vector> arrayOfPath;
     std::vector<std::wstring> paths;
-    std::wstring path;
+    std::string path;
 try {
     const auto file = toml::parse("..\\Info.toml");
     const auto data = toml::find(file, "path");
@@ -72,9 +73,9 @@ try {
 
     for(size_t i = 0; i < arrayOfPath.size(); i++)
     {
-        path = toml::find<std::wstring>(arrayOfPath, i);
+        path = toml::find<std::string>(arrayOfPath, i);
         if(!std::filesystem::is_directory(path) && std::filesystem::exists(path))
-           paths.push_back(path);
+           paths.push_back(converter.from_bytes(path));
     }
 
   }
@@ -99,7 +100,7 @@ try {
         size -= countOfThreads;
     }
 
-    if(count >= 4)
+    if(count >= countOfThreads)
       for(auto& x : threads) {
           x.join();
       }
